@@ -1,0 +1,107 @@
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
+import { PhotoUpload } from '../components/PhotoUpload'
+import { RichTextEditor } from '../components/RichTextEditor'
+import { ShareButton } from '../components/ShareButton'
+import {
+  deleteContainer,
+  removeContainerPhoto,
+  updateContainerContents,
+  uploadContainerPhoto,
+  useContainer,
+  useContainers,
+} from '../hooks/useContainers'
+import { useLocations } from '../hooks/useLocations'
+
+export function ContainerDetailPage() {
+  const { containerId } = useParams<{ containerId: string }>()
+  const navigate = useNavigate()
+  const { container, loading } = useContainer(containerId)
+  const { locations } = useLocations()
+  const { containers } = useContainers(container?.locationId)
+  const [showDelete, setShowDelete] = useState(false)
+
+  const location = locations.find((l) => l.id === container?.locationId)
+
+  const handleDelete = async () => {
+    if (!container) return
+    await deleteContainer(container, containers)
+    navigate(`/location/${container.locationId}`)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <p className="text-gray-500">Loading…</p>
+      </div>
+    )
+  }
+
+  if (!container) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-8 text-center">
+        <p className="text-gray-500">Container not found.</p>
+        <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">
+          Back to locations
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-8">
+      <Link
+        to={`/location/${container.locationId}`}
+        className="mb-4 inline-block text-sm text-blue-600 hover:underline"
+      >
+        ← {location?.name ?? 'Location'}
+      </Link>
+
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Container {container.number}
+        </h1>
+        <div className="flex items-center gap-2">
+          <ShareButton containerId={container.id} />
+          <button
+            type="button"
+            onClick={() => setShowDelete(true)}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">Contents</h2>
+          <RichTextEditor
+            content={container.contents}
+            onChange={(html) => updateContainerContents(container.id, html)}
+          />
+        </div>
+
+        <PhotoUpload
+          photos={container.photos}
+          onUpload={async (file) => {
+            await uploadContainerPhoto(container.id, file, container.photos)
+          }}
+          onRemove={async (photo) => {
+            await removeContainerPhoto(container.id, photo, container.photos)
+          }}
+        />
+      </div>
+
+      {showDelete && (
+        <ConfirmDeleteDialog
+          title="Delete container?"
+          message={`This will permanently delete Container ${container.number} and its photos.`}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDelete(false)}
+        />
+      )}
+    </div>
+  )
+}

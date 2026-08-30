@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+body {
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+.tiptap {
+  @apply min-h-[200px] outline-none;
+}
+
+.tiptap p {
+  @apply mb-2;
+}
+
+.tiptap ul {
+  @apply list-disc pl-5 mb-2;
+}
+
+.tiptap ol {
+  @apply list-decimal pl-5 mb-2;
+}
+
+.tiptap h1 {
+  @apply text-2xl font-bold mb-2;
+}
+
+.tiptap h2 {
+  @apply text-xl font-bold mb-2;
+}
+
+.tiptap h3 {
+  @apply text-lg font-semibold mb-2;
+}
