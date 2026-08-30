@@ -82,28 +82,17 @@ In your repo: **Settings → Secrets and variables → Actions**, these secrets 
 
 ### 3. Enable GitHub Pages
 
-Go to **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.
+Go to [Settings → Pages](https://github.com/bscaaron/storage-scan/settings/pages) → **Build and deployment → Source** and select **GitHub Actions** (not “Deploy from a branch”).
 
-### 3. Enable GitHub Pages
+Then push to `main` or run **Actions → Deploy to GitHub Pages → Run workflow**.
 
-Go to **Settings → Pages → Build and deployment → Source** and choose:
+### Troubleshooting
 
-- **Deploy from a branch**
-- Branch: **`gh-pages`**
-- Folder: **`/ (root)`**
+**Blank page (title shows but app does not load):** Pages is serving the source `main` branch instead of the built app. The live site was loading `/src/main.tsx` (dev-only). Fix: set Source to **GitHub Actions**, re-run the deploy workflow, wait 1–2 minutes, hard-refresh.
 
-Save, then either push to `main` or run **Actions → Deploy to GitHub Pages → Run workflow**.
+**404:** Confirm the latest **Deploy to GitHub Pages** Action succeeded and secrets `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` are set.
 
-The workflow builds the app and pushes the `dist` folder to the `gh-pages` branch.
-
-### Troubleshooting a 404
-
-If `https://bscaaron.github.io/storage-scan/` returns 404:
-
-1. Confirm Pages source is **`gh-pages`** branch (not `main`, not “GitHub Actions” unless you switch workflows).
-2. Open **Actions** and check the latest **Deploy to GitHub Pages** run succeeded.
-3. Confirm repo secrets `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are set.
-4. After the first successful deploy, wait 1–2 minutes and hard-refresh the browser.
+**Production URL:** `https://bscaaron.github.io/storage-scan/`
 
 ## Data Model
 
