@@ -2,7 +2,7 @@
 
 A web app for tracking the contents of storage containers throughout your home. Organize by location and optional rows, add rich-text notes and photos to each container, and share individual containers via link.
 
-**Live site:** `https://<your-username>.github.io/storage-scan/`
+**Live site:** `https://bscaaron.github.io/storage-scan/`
 
 ## Features
 
@@ -71,16 +71,39 @@ git push -u origin main
 
 ### 2. Add GitHub Secrets
 
-In your repo: **Settings → Secrets and variables → Actions**, add:
+In your repo: **Settings → Secrets and variables → Actions**, these secrets are used at build time:
 
-| Secret | Value |
+| Secret | Used for |
 |---|---|
-| `VITE_SUPABASE_URL` | `https://ncesmubuqxowqiohphrc.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `SUPABASE_URL` | Project URL → `VITE_SUPABASE_URL` |
+| `SUPABASE_PUBLISHABLE_KEY` | Client API key → `VITE_SUPABASE_ANON_KEY` |
+
+`SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` are not used by this frontend app and should not be injected into the build.
 
 ### 3. Enable GitHub Pages
 
 Go to **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.
+
+### 3. Enable GitHub Pages
+
+Go to **Settings → Pages → Build and deployment → Source** and choose:
+
+- **Deploy from a branch**
+- Branch: **`gh-pages`**
+- Folder: **`/ (root)`**
+
+Save, then either push to `main` or run **Actions → Deploy to GitHub Pages → Run workflow**.
+
+The workflow builds the app and pushes the `dist` folder to the `gh-pages` branch.
+
+### Troubleshooting a 404
+
+If `https://bscaaron.github.io/storage-scan/` returns 404:
+
+1. Confirm Pages source is **`gh-pages`** branch (not `main`, not “GitHub Actions” unless you switch workflows).
+2. Open **Actions** and check the latest **Deploy to GitHub Pages** run succeeded.
+3. Confirm repo secrets `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are set.
+4. After the first successful deploy, wait 1–2 minutes and hard-refresh the browser.
 
 ## Data Model
 
