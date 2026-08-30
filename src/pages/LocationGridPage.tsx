@@ -15,17 +15,21 @@ import type { Row } from '../types'
 export function LocationGridPage() {
   const { locationId } = useParams<{ locationId: string }>()
   const navigate = useNavigate()
-  const { location, loading: locationLoading } = useLocation(locationId)
-  const { rows, loading: rowsLoading } = useRows(locationId)
-  const { containers, loading: containersLoading } = useContainers(locationId)
+  const { location, refresh: refreshLocation } = useLocation(locationId)
+  const { rows, refresh: refreshRows } = useRows(locationId)
+  const { containers, refresh: refreshContainers } = useContainers(locationId)
 
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState('')
   const [deleteRowTarget, setDeleteRowTarget] = useState<Row | null>(null)
   const [showDeleteLocation, setShowDeleteLocation] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const unassigned = containers.filter((c) => c.rowId === null)
-  const loading = locationLoading || rowsLoading || containersLoading
+
+  const refreshAll = async () => {
+    await Promise.all([refreshLocation(), refreshRows(), refreshContainers()])
+  }
 
   const startEditing = () => {
     if (location) {
@@ -37,29 +41,49 @@ export function LocationGridPage() {
   const saveName = async () => {
     if (locationId && name.trim()) {
       await renameLocation(locationId, name.trim())
+      await refreshLocation()
     }
     setEditingName(false)
   }
 
   const handleAddRow = async () => {
-    if (!locationId) return
-    await createRow(locationId, rows)
+    if (!locationId || busy) return
+    setBusy(true)
+    try {
+      await createRow(locationId, rows)
+      await refreshRows()
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleAddContainer = async (rowId: string | null = null) => {
-    if (!locationId) return
-    await createContainer(locationId, rowId, containers)
+    if (!locationId || busy) return
+    setBusy(true)
+    try {
+      await createContainer(locationId, rowId, containers)
+      await Promise.all([refreshContainers(), refreshLocation()])
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleDeleteRow = async (row: Row) => {
-    const rowContainers = containers.filter((c) => c.rowId === row.id)
-    let remaining = [...containers]
-    for (const c of rowContainers) {
-      await deleteContainer(c, remaining)
-      remaining = remaining.filter((x) => x.id !== c.id)
+    if (busy) return
+    setBusy(true)
+    try {
+      const rowContainers = containers.filter((c) => c.rowId === row.id)
+      let remaining = [...containers]
+      for (const c of rowContainers) {
+        await deleteContainer(c, remaining)
+        remaining = remaining.filter((x) => x.id !== c.id)
+      }
+      await deleteRow(row, rows)
+      await refreshAll()
+      setDeleteRowTarget(null)
+    } finally {
+      setBusy(false)
     }
-    await deleteRow(row, rows)
-    setDeleteRowTarget(null)
   }
 
   const handleDeleteLocation = async () => {
@@ -68,21 +92,15 @@ export function LocationGridPage() {
     navigate('/')
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
-      </div>
-    )
-  }
-
   if (!location) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 text-center">
-        <p className="text-gray-500">Location not found.</p>
-        <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">
-          Back to locations
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <Link to="/" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+          ← All locations
         </Link>
+        <p className="text-gray-500">
+          {locationId ? 'Loading location…' : 'Location not found.'}
+        </p>
       </div>
     )
   }
@@ -117,14 +135,16 @@ export function LocationGridPage() {
           <button
             type="button"
             onClick={handleAddRow}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={busy}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             + Row
           </button>
           <button
             type="button"
             onClick={() => handleAddContainer(null)}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            disabled={busy}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             + Container
           </button>
@@ -143,21 +163,24 @@ export function LocationGridPage() {
           rows={rows}
           containers={containers}
           onDeleteRow={setDeleteRowTarget}
-          onReorderRows={(activeId, overId) =>
-            reorderRows(rows, activeId, overId)
-          }
-          onReorderContainers={(activeId, overId) =>
-            reorderContainers(containers, activeId, overId)
-          }
+          onReorderRows={async (activeId, overId) => {
+            await reorderRows(rows, activeId, overId)
+            await refreshRows()
+          }}
+          onReorderContainers={async (activeId, overId) => {
+            await reorderContainers(containers, activeId, overId)
+            await refreshContainers()
+          }}
           onAddContainer={(rowId) => handleAddContainer(rowId)}
         />
 
         {(rows.length === 0 || unassigned.length > 0) && (
           <UnassignedSection
             containers={rows.length === 0 ? containers : unassigned}
-            onReorderContainers={(activeId, overId) =>
-              reorderContainers(containers, activeId, overId)
-            }
+            onReorderContainers={async (activeId, overId) => {
+              await reorderContainers(containers, activeId, overId)
+              await refreshContainers()
+            }}
             onAddContainer={() => handleAddContainer(null)}
           />
         )}

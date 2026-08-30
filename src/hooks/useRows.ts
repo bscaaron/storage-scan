@@ -1,26 +1,37 @@
-import {
-  addDoc,
-  collection,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-} from 'firebase/firestore'
-import { useEffect, useState } from 'react'
-import { db } from '../lib/firebase'
-import {
-  deleteAndRenumber,
-  getNextNumber,
-  reorderItems,
-  sortByNumber,
-} from '../lib/numbering'
+import { useCallback, useEffect, useState } from 'react'
+import { cache, invalidateLocation } from '../lib/dataCache'
+import { mapRow } from '../lib/mappers'
+import { getNextNumber, renumberUpdates, sortByNumber } from '../lib/numbering'
+import { supabase } from '../lib/supabase'
 import type { Row } from '../types'
 
-const COLLECTION = 'rows'
+async function fetchRows(locationId: string): Promise<Row[]> {
+  const { data, error } = await supabase
+    .from('rows')
+    .select('*')
+    .eq('location_id', locationId)
+    .order('number')
+  if (error) throw error
+  return (data ?? []).map(mapRow)
+}
 
 export function useRows(locationId: string | undefined) {
-  const [rows, setRows] = useState<Row[]>([])
-  const [loading, setLoading] = useState(true)
+  const cached = locationId ? cache.rowsByLocation.get(locationId) : undefined
+  const [rows, setRows] = useState<Row[]>(cached ?? [])
+  const [loading, setLoading] = useState(Boolean(locationId && !cached))
+
+  const refresh = useCallback(async () => {
+    if (!locationId) {
+      setRows([])
+      setLoading(false)
+      return []
+    }
+    const data = await fetchRows(locationId)
+    cache.rowsByLocation.set(locationId, data)
+    setRows(data)
+    setLoading(false)
+    return data
+  }, [locationId])
 
   useEffect(() => {
     if (!locationId) {
@@ -28,35 +39,46 @@ export function useRows(locationId: string | undefined) {
       setLoading(false)
       return
     }
-
-    const q = query(
-      collection(db, COLLECTION),
-      where('locationId', '==', locationId),
-      orderBy('number'),
-    )
-    const unsub = onSnapshot(q, (snap) => {
-      setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Row))
+    const hit = cache.rowsByLocation.get(locationId)
+    if (hit) {
+      setRows(hit)
       setLoading(false)
-    })
-    return unsub
-  }, [locationId])
+      return
+    }
+    refresh()
+  }, [locationId, refresh])
 
-  return { rows, loading }
+  return { rows, loading, refresh, setRows }
 }
 
 export async function createRow(locationId: string, existingRows: Row[]) {
-  const now = Date.now()
-  const ref = await addDoc(collection(db, COLLECTION), {
-    locationId,
+  const now = new Date().toISOString()
+  const { error } = await supabase.from('rows').insert({
+    location_id: locationId,
     number: getNextNumber(existingRows),
-    createdAt: now,
-    updatedAt: now,
+    updated_at: now,
   })
-  return ref.id
+  if (error) throw error
+  invalidateLocation(locationId)
 }
 
 export async function deleteRow(row: Row, allRows: Row[]) {
-  await deleteAndRenumber(COLLECTION, allRows, row.id)
+  const { error: deleteError } = await supabase
+    .from('rows')
+    .delete()
+    .eq('id', row.id)
+  if (deleteError) throw deleteError
+
+  const remaining = sortByNumber(allRows.filter((r) => r.id !== row.id))
+  await Promise.all(
+    renumberUpdates(remaining).map(({ id, number }) =>
+      supabase
+        .from('rows')
+        .update({ number, updated_at: new Date().toISOString() })
+        .eq('id', id),
+    ),
+  )
+  invalidateLocation(row.locationId)
 }
 
 export async function reorderRows(
@@ -64,7 +86,27 @@ export async function reorderRows(
   activeId: string,
   overId: string,
 ) {
-  await reorderItems(COLLECTION, allRows, activeId, overId)
+  const sorted = sortByNumber(allRows)
+  const oldIndex = sorted.findIndex((r) => r.id === activeId)
+  const newIndex = sorted.findIndex((r) => r.id === overId)
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+  const reordered = [...sorted]
+  const [moved] = reordered.splice(oldIndex, 1)
+  reordered.splice(newIndex, 0, moved)
+
+  await Promise.all(
+    reordered.map((row, index) =>
+      supabase
+        .from('rows')
+        .update({
+          number: index + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id),
+    ),
+  )
+  if (allRows[0]) invalidateLocation(allRows[0].locationId)
 }
 
 export { sortByNumber }

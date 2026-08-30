@@ -4,6 +4,7 @@ import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
 import {
   createLocation,
   deleteLocation,
+  prefetchLocation,
   renameLocation,
   sortLocations,
   useLocations,
@@ -45,6 +46,7 @@ function LocationRow({
       ) : (
         <Link
           to={`/location/${location.id}`}
+          onMouseEnter={() => prefetchLocation(location.id)}
           className="flex-1 text-lg font-medium text-gray-900 hover:text-blue-600"
         >
           {location.name}
@@ -74,25 +76,24 @@ function LocationRow({
 }
 
 export function LocationListPage() {
-  const { locations, loading } = useLocations()
+  const { locations, loading, refresh } = useLocations()
   const [newName, setNewName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null)
+  const [saving, setSaving] = useState(false)
   const sorted = sortLocations(locations)
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = newName.trim()
-    if (!trimmed) return
-    await createLocation(trimmed)
+    if (!trimmed || saving) return
+    setSaving(true)
     setNewName('')
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-gray-500">Loading locations…</p>
-      </div>
-    )
+    try {
+      await createLocation(trimmed)
+      await refresh()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -112,13 +113,16 @@ export function LocationListPage() {
         />
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          disabled={saving}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Add Location
+          {saving ? 'Adding…' : 'Add Location'}
         </button>
       </form>
 
-      {sorted.length === 0 ? (
+      {loading && sorted.length === 0 ? (
+        <p className="text-center text-gray-500">Loading locations…</p>
+      ) : sorted.length === 0 ? (
         <p className="text-center text-gray-500">
           No locations yet. Add one above to get started.
         </p>
@@ -128,7 +132,10 @@ export function LocationListPage() {
             <LocationRow
               key={location.id}
               location={location}
-              onRename={renameLocation}
+              onRename={async (id, name) => {
+                await renameLocation(id, name)
+                await refresh()
+              }}
               onDelete={setDeleteTarget}
             />
           ))}
@@ -141,6 +148,7 @@ export function LocationListPage() {
           message={`This will permanently delete "${deleteTarget.name}" and all its rows and containers.`}
           onConfirm={async () => {
             await deleteLocation(deleteTarget.id)
+            await refresh()
             setDeleteTarget(null)
           }}
           onCancel={() => setDeleteTarget(null)}

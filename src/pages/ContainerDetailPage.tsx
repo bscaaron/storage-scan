@@ -22,7 +22,7 @@ const RichTextEditor = lazy(() =>
 export function ContainerDetailPage() {
   const { containerId } = useParams<{ containerId: string }>()
   const navigate = useNavigate()
-  const { container, loading } = useContainer(containerId)
+  const { container } = useContainer(containerId)
   const { location } = useLocation(container?.locationId)
   const [showDelete, setShowDelete] = useState(false)
 
@@ -33,21 +33,13 @@ export function ContainerDetailPage() {
     navigate(`/location/${container.locationId}`)
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
-      </div>
-    )
-  }
-
   if (!container) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 text-center">
-        <p className="text-gray-500">Container not found.</p>
-        <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">
-          Back to locations
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <Link to="/" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+          ← Back
         </Link>
+        <p className="text-gray-500">Loading container…</p>
       </div>
     )
   }

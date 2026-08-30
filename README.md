@@ -17,7 +17,7 @@ A web app for tracking the contents of storage containers throughout your home. 
 
 - React + TypeScript + Vite
 - Tailwind CSS
-- Firebase Firestore (data) + Storage (photos)
+- Supabase (PostgreSQL + Storage)
 - GitHub Pages (hosting)
 
 ## Local Development
@@ -30,16 +30,15 @@ cd storage-scan
 npm install
 ```
 
-### 2. Create a Firebase project
+### 2. Supabase project
 
-This app is configured for Firebase project **`points-app-e3f7b`**.
+This app uses Supabase project **Storage Scan** (`ncesmubuqxowqiohphrc`).
 
-1. Firestore and the web app are already provisioned
-2. **Storage requires one manual step** — open [Firebase Storage setup](https://console.firebase.google.com/project/points-app-e3f7b/storage), upgrade to the **Blaze** plan if prompted, click **Get Started**, choose a location (e.g. `us-central1`), then click **Done**
-3. After Storage is enabled, deploy storage rules:
-   ```bash
-   npx firebase-tools@latest deploy --only storage
-   ```
+The database schema is in [`supabase/migrations/`](supabase/migrations/). It creates:
+
+- `locations`, `rows`, `containers` tables
+- `photos` storage bucket
+- Open RLS policies (no auth, per original design)
 
 ### 3. Configure environment
 
@@ -47,17 +46,14 @@ This app is configured for Firebase project **`points-app-e3f7b`**.
 cp .env.example .env
 ```
 
-Fill in your Firebase config values in `.env`.
+Fill in from [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/ncesmubuqxowqiohphrc/settings/api):
 
-### 4. Deploy Firebase rules and indexes
+| Variable | Description |
+|---|---|
+| `VITE_SUPABASE_URL` | Project URL |
+| `VITE_SUPABASE_ANON_KEY` | anon/public key |
 
-```bash
-npx firebase-tools login
-npx firebase-tools use --add   # select your project
-npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage
-```
-
-### 5. Run locally
+### 4. Run locally
 
 ```bash
 npm run dev
@@ -70,7 +66,6 @@ Open `http://localhost:5173/storage-scan/`
 ### 1. Push to GitHub
 
 ```bash
-git remote add origin https://github.com/<your-username>/storage-scan.git
 git push -u origin main
 ```
 
@@ -80,29 +75,23 @@ In your repo: **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Value |
 |---|---|
-| `VITE_FIREBASE_API_KEY` | Firebase API key |
-| `VITE_FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` |
-| `VITE_FIREBASE_PROJECT_ID` | Project ID |
-| `VITE_FIREBASE_STORAGE_BUCKET` | `your-project.appspot.com` |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Sender ID |
-| `VITE_FIREBASE_APP_ID` | App ID |
+| `VITE_SUPABASE_URL` | `https://ncesmubuqxowqiohphrc.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key |
 
 ### 3. Enable GitHub Pages
 
 Go to **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**.
 
-Pushing to `main` will automatically build and deploy.
-
 ## Data Model
 
-```
-locations/{id}     — name, sortOrder
-rows/{id}          — locationId, number (sequential per location)
-containers/{id}    — locationId, rowId?, number, contents, photos[]
+```sql
+locations (id, name, sort_order, container_count)
+rows      (id, location_id, number)          -- unique per location
+containers(id, location_id, row_id, number, contents, photos)
 ```
 
-Container and row numbers are sequential within a location and never repeat. Share links use stable container UUIDs so renumbering does not break links.
+Container and row numbers are sequential within a location. Share links use stable container UUIDs.
 
 ## Security Note
 
-This app uses open Firestore and Storage rules (no authentication). Anyone with the app URL can read and write data. Share pages are read-only in the UI only. Suitable for personal household use with a non-obvious URL.
+This app uses open RLS and storage policies (no authentication). Anyone with the app URL can read and write data. Share pages are read-only in the UI only. Suitable for personal household use with a non-obvious URL.

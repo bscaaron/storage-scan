@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PhotoUpload } from '../components/PhotoUpload'
 import { getContainerLocationName, useContainer } from '../hooks/useContainers'
+import { useLocation } from '../hooks/useLocations'
 
 const RichTextDisplay = lazy(() =>
   import('../components/RichTextEditor').then((m) => ({
@@ -11,27 +12,22 @@ const RichTextDisplay = lazy(() =>
 
 export function ShareContainerPage() {
   const { containerId } = useParams<{ containerId: string }>()
-  const { container, loading } = useContainer(containerId)
+  const { container } = useContainer(containerId)
+  const { location } = useLocation(container?.locationId)
   const [locationName, setLocationName] = useState<string | null>(null)
 
   useEffect(() => {
-    if (container) {
+    if (location?.name) {
+      setLocationName(location.name)
+    } else if (container) {
       getContainerLocationName(container.locationId).then(setLocationName)
     }
-  }, [container])
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-gray-500">Loading…</p>
-      </div>
-    )
-  }
+  }, [container, location])
 
   if (!container) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 text-center">
-        <p className="text-gray-500">Container not found.</p>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <p className="text-gray-500">Loading container…</p>
       </div>
     )
   }

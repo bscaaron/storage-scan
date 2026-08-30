@@ -1,51 +1,67 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  updateDoc,
-  writeBatch,
-  getDocs,
-  where,
-} from 'firebase/firestore'
-import { useEffect, useState } from 'react'
-import { db } from '../lib/firebase'
+import { useCallback, useEffect, useState } from 'react'
+import { cache, invalidateLocation, invalidateLocations } from '../lib/dataCache'
+import { mapLocation, mapRow } from '../lib/mappers'
+import { supabase } from '../lib/supabase'
 import type { Location } from '../types'
 
-const COLLECTION = 'locations'
-
-function mapLocation(id: string, data: Record<string, unknown>): Location {
-  return {
-    id,
-    name: data.name as string,
-    sortOrder: (data.sortOrder as number) ?? 0,
-    containerCount: (data.containerCount as number) ?? 0,
-    createdAt: data.createdAt as number,
-    updatedAt: data.updatedAt as number,
-  }
+async function fetchLocations(): Promise<Location[]> {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return (data ?? []).map(mapLocation)
 }
 
 export function useLocations() {
-  const [locations, setLocations] = useState<Location[]>([])
-  const [loading, setLoading] = useState(true)
+  const [locations, setLocations] = useState<Location[]>(cache.locations ?? [])
+  const [loading, setLoading] = useState(cache.locations === null)
 
-  useEffect(() => {
-    const q = query(collection(db, COLLECTION), orderBy('name'))
-    const unsub = onSnapshot(q, (snap) => {
-      setLocations(snap.docs.map((d) => mapLocation(d.id, d.data())))
-      setLoading(false)
-    })
-    return unsub
+  const refresh = useCallback(async () => {
+    const data = await fetchLocations()
+    cache.locations = data
+    data.forEach((loc) => cache.locationById.set(loc.id, loc))
+    setLocations(data)
+    setLoading(false)
+    return data
   }, [])
 
-  return { locations, loading }
+  useEffect(() => {
+    if (cache.locations) {
+      setLocations(cache.locations)
+      setLoading(false)
+      return
+    }
+    refresh()
+  }, [refresh])
+
+  return { locations, loading, refresh }
 }
 
 export function useLocation(locationId: string | undefined) {
-  const [location, setLocation] = useState<Location | null>(null)
-  const [loading, setLoading] = useState(true)
+  const cached = locationId ? cache.locationById.get(locationId) : undefined
+  const [location, setLocation] = useState<Location | null>(cached ?? null)
+  const [loading, setLoading] = useState(Boolean(locationId && !cached))
+
+  const refresh = useCallback(async () => {
+    if (!locationId) {
+      setLocation(null)
+      setLoading(false)
+      return null
+    }
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('id', locationId)
+      .maybeSingle()
+    if (error) throw error
+    const mapped = data ? mapLocation(data) : null
+    if (mapped) cache.locationById.set(locationId, mapped)
+    else cache.locationById.delete(locationId)
+    setLocation(mapped)
+    setLoading(false)
+    return mapped
+  }, [locationId])
 
   useEffect(() => {
     if (!locationId) {
@@ -53,56 +69,93 @@ export function useLocation(locationId: string | undefined) {
       setLoading(false)
       return
     }
-
-    const unsub = onSnapshot(doc(db, COLLECTION, locationId), (snap) => {
-      setLocation(snap.exists() ? mapLocation(snap.id, snap.data()) : null)
+    const hit = cache.locationById.get(locationId)
+    if (hit) {
+      setLocation(hit)
       setLoading(false)
-    })
-    return unsub
-  }, [locationId])
+      return
+    }
+    refresh()
+  }, [locationId, refresh])
 
-  return { location, loading }
+  return { location, loading, refresh }
+}
+
+export async function prefetchLocation(locationId: string) {
+  if (
+    cache.locationById.has(locationId) &&
+    cache.rowsByLocation.has(locationId) &&
+    cache.containersByLocation.has(locationId)
+  ) {
+    return
+  }
+
+  const [locationRes, rowsRes, containersRes] = await Promise.all([
+    supabase.from('locations').select('*').eq('id', locationId).maybeSingle(),
+    supabase
+      .from('rows')
+      .select('*')
+      .eq('location_id', locationId)
+      .order('number'),
+    supabase
+      .from('containers')
+      .select('id, location_id, row_id, number, created_at, updated_at')
+      .eq('location_id', locationId)
+      .order('number'),
+  ])
+
+  if (locationRes.data) {
+    cache.locationById.set(locationId, mapLocation(locationRes.data))
+  }
+  cache.rowsByLocation.set(
+    locationId,
+    (rowsRes.data ?? []).map(mapRow),
+  )
+  cache.containersByLocation.set(
+    locationId,
+    (containersRes.data ?? []).map((row) => ({
+      id: row.id,
+      locationId: row.location_id,
+      rowId: row.row_id,
+      number: row.number,
+      createdAt: new Date(row.created_at).getTime(),
+      updatedAt: new Date(row.updated_at).getTime(),
+    })),
+  )
 }
 
 export async function createLocation(name: string): Promise<string> {
   const now = Date.now()
-  const snap = await getDocs(collection(db, COLLECTION))
-  const maxSort = snap.docs.reduce(
-    (max, d) => Math.max(max, (d.data().sortOrder as number) ?? 0),
-    0,
-  )
-  const ref = await addDoc(collection(db, COLLECTION), {
-    name,
-    sortOrder: maxSort + 1,
-    containerCount: 0,
-    createdAt: now,
-    updatedAt: now,
-  })
-  return ref.id
+  const { data, error } = await supabase
+    .from('locations')
+    .insert({
+      name,
+      sort_order: now,
+      container_count: 0,
+      updated_at: new Date(now).toISOString(),
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  invalidateLocations()
+  return data.id
 }
 
 export async function renameLocation(id: string, name: string) {
-  await updateDoc(doc(db, COLLECTION, id), { name, updatedAt: Date.now() })
+  const { error } = await supabase
+    .from('locations')
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+  invalidateLocations()
+  invalidateLocation(id)
 }
 
 export async function deleteLocation(id: string) {
-  const batch = writeBatch(db)
-
-  const rowsSnap = await getDocs(
-    query(collection(db, 'rows'), where('locationId', '==', id)),
-  )
-  rowsSnap.docs.forEach((d) => batch.delete(d.ref))
-
-  const containersSnap = await getDocs(
-    query(collection(db, 'containers'), where('locationId', '==', id)),
-  )
-  containersSnap.docs.forEach((d) => {
-    batch.delete(d.ref)
-    batch.delete(doc(db, 'containerDetails', d.id))
-  })
-
-  batch.delete(doc(db, COLLECTION, id))
-  await batch.commit()
+  const { error } = await supabase.from('locations').delete().eq('id', id)
+  if (error) throw error
+  invalidateLocations()
+  invalidateLocation(id)
 }
 
 export function sortLocations(locations: Location[]): Location[] {

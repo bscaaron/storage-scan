@@ -1,91 +1,65 @@
+import { useCallback, useEffect, useState } from 'react'
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  onSnapshot,
-  query,
-  setDoc,
-  updateDoc,
-  where,
-  orderBy,
-  deleteDoc,
-} from 'firebase/firestore'
+  cache,
+  invalidateContainer,
+  invalidateLocation,
+} from '../lib/dataCache'
 import {
-  deleteObject,
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytes,
-} from 'firebase/storage'
-import { useEffect, useState } from 'react'
-import { db, storage } from '../lib/firebase'
+  mapContainer,
+  mapContainerSummary,
+} from '../lib/mappers'
 import {
-  deleteAndRenumber,
   getNextNumber,
-  reorderItems,
+  renumberUpdates,
   sortByNumber,
 } from '../lib/numbering'
+import { supabase } from '../lib/supabase'
 import type {
   Container,
-  ContainerDetails,
   ContainerPhoto,
   ContainerSummary,
 } from '../types'
 
-const COLLECTION = 'containers'
-const DETAILS_COLLECTION = 'containerDetails'
+const SUMMARY_COLUMNS =
+  'id, location_id, row_id, number, created_at, updated_at'
 
-function mapSummary(id: string, data: Record<string, unknown>): ContainerSummary {
-  return {
-    id,
-    locationId: data.locationId as string,
-    rowId: (data.rowId as string | null) ?? null,
-    number: data.number as number,
-    createdAt: data.createdAt as number,
-    updatedAt: data.updatedAt as number,
-  }
+async function fetchContainers(locationId: string): Promise<ContainerSummary[]> {
+  const { data, error } = await supabase
+    .from('containers')
+    .select(SUMMARY_COLUMNS)
+    .eq('location_id', locationId)
+    .order('number')
+  if (error) throw error
+  return (data ?? []).map(mapContainerSummary)
 }
 
-function mapDetails(data: Record<string, unknown> | undefined): ContainerDetails {
-  return {
-    contents: (data?.contents as string) ?? '',
-    photos: (data?.photos as ContainerPhoto[]) ?? [],
-  }
-}
-
-function mergeContainer(
-  summary: ContainerSummary,
-  details: ContainerDetails,
-): Container {
-  return { ...summary, ...details }
-}
-
-async function readDetails(containerId: string): Promise<ContainerDetails> {
-  const detailsSnap = await getDoc(doc(db, DETAILS_COLLECTION, containerId))
-  if (detailsSnap.exists()) {
-    return mapDetails(detailsSnap.data())
-  }
-
-  const containerSnap = await getDoc(doc(db, COLLECTION, containerId))
-  if (containerSnap.exists()) {
-    return mapDetails(containerSnap.data())
-  }
-
-  return { contents: '', photos: [] }
-}
-
-async function adjustContainerCount(locationId: string, delta: number) {
-  await updateDoc(doc(db, 'locations', locationId), {
-    containerCount: increment(delta),
-    updatedAt: Date.now(),
-  })
+async function fetchContainer(containerId: string): Promise<Container | null> {
+  const { data, error } = await supabase
+    .from('containers')
+    .select('*')
+    .eq('id', containerId)
+    .maybeSingle()
+  if (error) throw error
+  return data ? mapContainer(data) : null
 }
 
 export function useContainers(locationId: string | undefined) {
-  const [containers, setContainers] = useState<ContainerSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  const cached = locationId ? cache.containersByLocation.get(locationId) : undefined
+  const [containers, setContainers] = useState<ContainerSummary[]>(cached ?? [])
+  const [loading, setLoading] = useState(Boolean(locationId && !cached))
+
+  const refresh = useCallback(async () => {
+    if (!locationId) {
+      setContainers([])
+      setLoading(false)
+      return []
+    }
+    const data = await fetchContainers(locationId)
+    cache.containersByLocation.set(locationId, data)
+    setContainers(data)
+    setLoading(false)
+    return data
+  }, [locationId])
 
   useEffect(() => {
     if (!locationId) {
@@ -93,25 +67,36 @@ export function useContainers(locationId: string | undefined) {
       setLoading(false)
       return
     }
-
-    const q = query(
-      collection(db, COLLECTION),
-      where('locationId', '==', locationId),
-      orderBy('number'),
-    )
-    const unsub = onSnapshot(q, (snap) => {
-      setContainers(snap.docs.map((d) => mapSummary(d.id, d.data())))
+    const hit = cache.containersByLocation.get(locationId)
+    if (hit) {
+      setContainers(hit)
       setLoading(false)
-    })
-    return unsub
-  }, [locationId])
+      return
+    }
+    refresh()
+  }, [locationId, refresh])
 
-  return { containers, loading }
+  return { containers, loading, refresh, setContainers }
 }
 
 export function useContainer(containerId: string | undefined) {
-  const [container, setContainer] = useState<Container | null>(null)
-  const [loading, setLoading] = useState(true)
+  const cached = containerId ? cache.containerById.get(containerId) : undefined
+  const [container, setContainer] = useState<Container | null>(cached ?? null)
+  const [loading, setLoading] = useState(Boolean(containerId && !cached))
+
+  const refresh = useCallback(async () => {
+    if (!containerId) {
+      setContainer(null)
+      setLoading(false)
+      return null
+    }
+    const data = await fetchContainer(containerId)
+    if (data) cache.containerById.set(containerId, data)
+    else cache.containerById.delete(containerId)
+    setContainer(data)
+    setLoading(false)
+    return data
+  }, [containerId])
 
   useEffect(() => {
     if (!containerId) {
@@ -119,62 +104,16 @@ export function useContainer(containerId: string | undefined) {
       setLoading(false)
       return
     }
-
-    let summary: ContainerSummary | null = null
-    let details: ContainerDetails = { contents: '', photos: [] }
-    let legacyDetails: ContainerDetails | null = null
-    let summaryReady = false
-    let detailsReady = false
-
-    const publish = () => {
-      if (!summaryReady || !detailsReady) return
-      if (!summary) {
-        setContainer(null)
-      } else {
-        const resolvedDetails =
-          details.contents || details.photos.length > 0
-            ? details
-            : (legacyDetails ?? details)
-        setContainer(mergeContainer(summary, resolvedDetails))
-      }
+    const hit = cache.containerById.get(containerId)
+    if (hit) {
+      setContainer(hit)
       setLoading(false)
+      return
     }
+    refresh()
+  }, [containerId, refresh])
 
-    const unsubSummary = onSnapshot(doc(db, COLLECTION, containerId), (snap) => {
-      summaryReady = true
-      if (!snap.exists()) {
-        summary = null
-        legacyDetails = null
-      } else {
-        const data = snap.data()
-        summary = mapSummary(snap.id, data)
-        if (data.contents !== undefined || data.photos !== undefined) {
-          legacyDetails = mapDetails(data)
-        }
-      }
-      publish()
-    })
-
-    const unsubDetails = onSnapshot(
-      doc(db, DETAILS_COLLECTION, containerId),
-      (snap) => {
-        detailsReady = true
-        if (snap.exists()) {
-          details = mapDetails(snap.data())
-        } else if (summary) {
-          details = { contents: '', photos: [] }
-        }
-        publish()
-      },
-    )
-
-    return () => {
-      unsubSummary()
-      unsubDetails()
-    }
-  }, [containerId])
-
-  return { container, loading }
+  return { container, loading, refresh, setContainer }
 }
 
 export async function createContainer(
@@ -182,41 +121,54 @@ export async function createContainer(
   rowId: string | null,
   existingContainers: ContainerSummary[],
 ) {
-  const now = Date.now()
-  const ref = await addDoc(collection(db, COLLECTION), {
-    locationId,
-    rowId,
+  const now = new Date().toISOString()
+  const { error } = await supabase.from('containers').insert({
+    location_id: locationId,
+    row_id: rowId,
     number: getNextNumber(existingContainers),
-    createdAt: now,
-    updatedAt: now,
-  })
-
-  await setDoc(doc(db, DETAILS_COLLECTION, ref.id), {
     contents: '',
     photos: [],
-    updatedAt: now,
+    updated_at: now,
   })
-  await adjustContainerCount(locationId, 1)
+  if (error) throw error
+  invalidateLocation(locationId)
+  invalidateLocationsList()
+}
 
-  return ref.id
+function invalidateLocationsList() {
+  cache.locations = null
 }
 
 export async function deleteContainer(
   container: ContainerSummary,
   allContainers: ContainerSummary[],
 ) {
-  const details = await readDetails(container.id)
-  for (const photo of details.photos) {
-    try {
-      await deleteObject(storageRef(storage, photo.storagePath))
-    } catch {
-      // photo may already be deleted
+  const full = cache.containerById.get(container.id) ?? (await fetchContainer(container.id))
+  if (full) {
+    for (const photo of full.photos) {
+      await supabase.storage.from('photos').remove([photo.storagePath])
     }
   }
 
-  await deleteDoc(doc(db, DETAILS_COLLECTION, container.id))
-  await deleteAndRenumber(COLLECTION, allContainers, container.id)
-  await adjustContainerCount(container.locationId, -1)
+  const { error } = await supabase
+    .from('containers')
+    .delete()
+    .eq('id', container.id)
+  if (error) throw error
+
+  const remaining = sortByNumber(allContainers.filter((c) => c.id !== container.id))
+  await Promise.all(
+    renumberUpdates(remaining).map(({ id, number }) =>
+      supabase
+        .from('containers')
+        .update({ number, updated_at: new Date().toISOString() })
+        .eq('id', id),
+    ),
+  )
+
+  invalidateLocation(container.locationId)
+  invalidateContainer(container.id)
+  invalidateLocationsList()
 }
 
 export async function reorderContainers(
@@ -224,28 +176,41 @@ export async function reorderContainers(
   activeId: string,
   overId: string,
 ) {
-  await reorderItems(COLLECTION, allContainers, activeId, overId)
-}
+  const sorted = sortByNumber(allContainers)
+  const oldIndex = sorted.findIndex((c) => c.id === activeId)
+  const newIndex = sorted.findIndex((c) => c.id === overId)
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
 
-export async function moveContainerToRow(
-  containerId: string,
-  rowId: string | null,
-) {
-  await updateDoc(doc(db, COLLECTION, containerId), {
-    rowId,
-    updatedAt: Date.now(),
-  })
+  const reordered = [...sorted]
+  const [moved] = reordered.splice(oldIndex, 1)
+  reordered.splice(newIndex, 0, moved)
+
+  await Promise.all(
+    reordered.map((item, index) =>
+      supabase
+        .from('containers')
+        .update({
+          number: index + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', item.id),
+    ),
+  )
+  if (allContainers[0]) invalidateLocation(allContainers[0].locationId)
 }
 
 export async function updateContainerContents(
   containerId: string,
   contents: string,
 ) {
-  await setDoc(
-    doc(db, DETAILS_COLLECTION, containerId),
-    { contents, updatedAt: Date.now() },
-    { merge: true },
-  )
+  const { error } = await supabase
+    .from('containers')
+    .update({ contents, updated_at: new Date().toISOString() })
+    .eq('id', containerId)
+  if (error) throw error
+
+  const cached = cache.containerById.get(containerId)
+  if (cached) cache.containerById.set(containerId, { ...cached, contents })
 }
 
 export async function uploadContainerPhoto(
@@ -255,20 +220,29 @@ export async function uploadContainerPhoto(
 ): Promise<ContainerPhoto[]> {
   const photoId = crypto.randomUUID()
   const ext = file.name.split('.').pop() ?? 'jpg'
-  const path = `photos/${containerId}/${photoId}.${ext}`
-  const fileRef = storageRef(storage, path)
+  const path = `${containerId}/${photoId}.${ext}`
 
-  await uploadBytes(fileRef, file)
-  const url = await getDownloadURL(fileRef)
+  const { error: uploadError } = await supabase.storage
+    .from('photos')
+    .upload(path, file)
+  if (uploadError) throw uploadError
 
-  const newPhoto: ContainerPhoto = { id: photoId, url, storagePath: path }
+  const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path)
+  const newPhoto: ContainerPhoto = {
+    id: photoId,
+    url: urlData.publicUrl,
+    storagePath: path,
+  }
   const photos = [...existingPhotos, newPhoto]
 
-  await setDoc(
-    doc(db, DETAILS_COLLECTION, containerId),
-    { photos, updatedAt: Date.now() },
-    { merge: true },
-  )
+  const { error } = await supabase
+    .from('containers')
+    .update({ photos, updated_at: new Date().toISOString() })
+    .eq('id', containerId)
+  if (error) throw error
+
+  const cached = cache.containerById.get(containerId)
+  if (cached) cache.containerById.set(containerId, { ...cached, photos })
 
   return photos
 }
@@ -278,18 +252,17 @@ export async function removeContainerPhoto(
   photo: ContainerPhoto,
   existingPhotos: ContainerPhoto[],
 ): Promise<ContainerPhoto[]> {
-  try {
-    await deleteObject(storageRef(storage, photo.storagePath))
-  } catch {
-    // photo may already be deleted
-  }
+  await supabase.storage.from('photos').remove([photo.storagePath])
 
   const photos = existingPhotos.filter((p) => p.id !== photo.id)
-  await setDoc(
-    doc(db, DETAILS_COLLECTION, containerId),
-    { photos, updatedAt: Date.now() },
-    { merge: true },
-  )
+  const { error } = await supabase
+    .from('containers')
+    .update({ photos, updated_at: new Date().toISOString() })
+    .eq('id', containerId)
+  if (error) throw error
+
+  const cached = cache.containerById.get(containerId)
+  if (cached) cache.containerById.set(containerId, { ...cached, photos })
 
   return photos
 }
@@ -297,22 +270,28 @@ export async function removeContainerPhoto(
 export async function getLocationContainers(
   locationId: string,
 ): Promise<ContainerSummary[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where('locationId', '==', locationId),
-      orderBy('number'),
-    ),
-  )
-  return snap.docs.map((d) => mapSummary(d.id, d.data()))
+  return fetchContainers(locationId)
 }
 
 export async function getContainerLocationName(
   locationId: string,
 ): Promise<string | null> {
-  const locSnap = await getDoc(doc(db, 'locations', locationId))
-  if (!locSnap.exists()) return null
-  return locSnap.data().name as string
+  const cached = cache.locationById.get(locationId)
+  if (cached) return cached.name
+
+  const { data, error } = await supabase
+    .from('locations')
+    .select('name')
+    .eq('id', locationId)
+    .maybeSingle()
+  if (error) throw error
+  return data?.name ?? null
+}
+
+export async function prefetchContainer(containerId: string) {
+  if (cache.containerById.has(containerId)) return
+  const data = await fetchContainer(containerId)
+  if (data) cache.containerById.set(containerId, data)
 }
 
 export { sortByNumber }
