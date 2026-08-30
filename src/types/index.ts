@@ -2,6 +2,7 @@ export interface Location {
   id: string
   name: string
   sortOrder: number
+  containerCount: number
   createdAt: number
   updatedAt: number
 }
@@ -21,13 +22,21 @@ export interface ContainerPhoto {
   caption?: string
 }
 
-export interface Container {
+export interface ContainerSummary {
   id: string
   locationId: string
   rowId: string | null
   number: number
-  contents: string
-  photos: ContainerPhoto[]
   createdAt: number
   updatedAt: number
+}
+
+export interface Container extends ContainerSummary {
+  contents: string
+  photos: ContainerPhoto[]
+}
+
+export interface ContainerDetails {
+  contents: string
+  photos: ContainerPhoto[]
 }

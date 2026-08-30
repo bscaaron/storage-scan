@@ -1,32 +1,35 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
 import { PhotoUpload } from '../components/PhotoUpload'
-import { RichTextEditor } from '../components/RichTextEditor'
 import { ShareButton } from '../components/ShareButton'
 import {
   deleteContainer,
+  getLocationContainers,
   removeContainerPhoto,
   updateContainerContents,
   uploadContainerPhoto,
   useContainer,
-  useContainers,
 } from '../hooks/useContainers'
-import { useLocations } from '../hooks/useLocations'
+import { useLocation } from '../hooks/useLocations'
+
+const RichTextEditor = lazy(() =>
+  import('../components/RichTextEditor').then((m) => ({
+    default: m.RichTextEditor,
+  })),
+)
 
 export function ContainerDetailPage() {
   const { containerId } = useParams<{ containerId: string }>()
   const navigate = useNavigate()
   const { container, loading } = useContainer(containerId)
-  const { locations } = useLocations()
-  const { containers } = useContainers(container?.locationId)
+  const { location } = useLocation(container?.locationId)
   const [showDelete, setShowDelete] = useState(false)
-
-  const location = locations.find((l) => l.id === container?.locationId)
 
   const handleDelete = async () => {
     if (!container) return
-    await deleteContainer(container, containers)
+    const siblings = await getLocationContainers(container.locationId)
+    await deleteContainer(container, siblings)
     navigate(`/location/${container.locationId}`)
   }
 
@@ -77,10 +80,18 @@ export function ContainerDetailPage() {
       <div className="space-y-6">
         <div>
           <h2 className="mb-2 text-sm font-semibold text-gray-700">Contents</h2>
-          <RichTextEditor
-            content={container.contents}
-            onChange={(html) => updateContainerContents(container.id, html)}
-          />
+          <Suspense
+            fallback={
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+                Loading editor…
+              </div>
+            }
+          >
+            <RichTextEditor
+              content={container.contents}
+              onChange={(html) => updateContainerContents(container.id, html)}
+            />
+          </Suspense>
         </div>
 
         <PhotoUpload

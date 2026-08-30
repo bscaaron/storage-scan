@@ -8,25 +8,24 @@ import {
   reorderContainers,
   useContainers,
 } from '../hooks/useContainers'
-import { useLocations, renameLocation, deleteLocation } from '../hooks/useLocations'
+import { useLocation, renameLocation, deleteLocation } from '../hooks/useLocations'
 import { createRow, deleteRow, reorderRows, useRows } from '../hooks/useRows'
 import type { Row } from '../types'
 
 export function LocationGridPage() {
   const { locationId } = useParams<{ locationId: string }>()
   const navigate = useNavigate()
-  const { locations, loading: locationsLoading } = useLocations()
+  const { location, loading: locationLoading } = useLocation(locationId)
   const { rows, loading: rowsLoading } = useRows(locationId)
   const { containers, loading: containersLoading } = useContainers(locationId)
 
-  const location = locations.find((l) => l.id === locationId)
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState('')
   const [deleteRowTarget, setDeleteRowTarget] = useState<Row | null>(null)
   const [showDeleteLocation, setShowDeleteLocation] = useState(false)
 
   const unassigned = containers.filter((c) => c.rowId === null)
-  const loading = locationsLoading || rowsLoading || containersLoading
+  const loading = locationLoading || rowsLoading || containersLoading
 
   const startEditing = () => {
     if (location) {

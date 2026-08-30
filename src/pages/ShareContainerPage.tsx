@@ -1,11 +1,13 @@
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PhotoUpload } from '../components/PhotoUpload'
-import { RichTextDisplay } from '../components/RichTextEditor'
-import {
-  getContainerLocationName,
-  useContainer,
-} from '../hooks/useContainers'
-import { useEffect, useState } from 'react'
+import { getContainerLocationName, useContainer } from '../hooks/useContainers'
+
+const RichTextDisplay = lazy(() =>
+  import('../components/RichTextEditor').then((m) => ({
+    default: m.RichTextDisplay,
+  })),
+)
 
 export function ShareContainerPage() {
   const { containerId } = useParams<{ containerId: string }>()
@@ -14,7 +16,7 @@ export function ShareContainerPage() {
 
   useEffect(() => {
     if (container) {
-      getContainerLocationName(container).then(setLocationName)
+      getContainerLocationName(container.locationId).then(setLocationName)
     }
   }, [container])
 
@@ -47,7 +49,9 @@ export function ShareContainerPage() {
         <div>
           <h2 className="mb-2 text-sm font-semibold text-gray-700">Contents</h2>
           <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <RichTextDisplay content={container.contents} />
+            <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
+              <RichTextDisplay content={container.contents} />
+            </Suspense>
           </div>
         </div>
 

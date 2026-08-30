@@ -8,17 +8,14 @@ import {
   sortLocations,
   useLocations,
 } from '../hooks/useLocations'
-import { useContainers } from '../hooks/useContainers'
 import type { Location } from '../types'
 
 function LocationRow({
   location,
-  containerCount,
   onRename,
   onDelete,
 }: {
   location: Location
-  containerCount: number
   onRename: (id: string, name: string) => void
   onDelete: (location: Location) => void
 }) {
@@ -55,7 +52,7 @@ function LocationRow({
       )}
 
       <span className="text-sm text-gray-500">
-        {containerCount} container{containerCount !== 1 ? 's' : ''}
+        {location.containerCount} container{location.containerCount !== 1 ? 's' : ''}
       </span>
 
       <button
@@ -73,26 +70,6 @@ function LocationRow({
         Delete
       </button>
     </div>
-  )
-}
-
-function LocationRowWithCount({
-  location,
-  onRename,
-  onDelete,
-}: {
-  location: Location
-  onRename: (id: string, name: string) => void
-  onDelete: (location: Location) => void
-}) {
-  const { containers } = useContainers(location.id)
-  return (
-    <LocationRow
-      location={location}
-      containerCount={containers.length}
-      onRename={onRename}
-      onDelete={onDelete}
-    />
   )
 }
 
@@ -148,7 +125,7 @@ export function LocationListPage() {
       ) : (
         <div className="space-y-3">
           {sorted.map((location) => (
-            <LocationRowWithCount
+            <LocationRow
               key={location.id}
               location={location}
               onRename={renameLocation}

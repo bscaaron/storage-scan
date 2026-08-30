@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import type { Container } from '../types'
+import type { ContainerSummary } from '../types'
 
 interface ContainerTileProps {
-  container: Container
+  container: ContainerSummary
 }
 
 export function ContainerTile({ container }: ContainerTileProps) {

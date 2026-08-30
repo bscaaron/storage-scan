@@ -15,10 +15,10 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link } from 'react-router-dom'
-import type { Container } from '../types'
+import type { ContainerSummary } from '../types'
 
 interface SortableContainerTileProps {
-  container: Container
+  container: ContainerSummary
 }
 
 function SortableContainerTile({ container }: SortableContainerTileProps) {
@@ -51,7 +51,7 @@ function SortableContainerTile({ container }: SortableContainerTileProps) {
 }
 
 interface ContainerGridProps {
-  containers: Container[]
+  containers: ContainerSummary[]
   onReorder?: (activeId: string, overId: string) => void
   sortable?: boolean
 }

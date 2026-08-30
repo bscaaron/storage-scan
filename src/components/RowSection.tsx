@@ -15,11 +15,11 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ContainerGrid } from './ContainerGrid'
-import type { Container, Row } from '../types'
+import type { ContainerSummary, Row } from '../types'
 
 interface RowSectionProps {
   row: Row
-  containers: Container[]
+  containers: ContainerSummary[]
   onDeleteRow: (row: Row) => void
   onReorderContainers: (activeId: string, overId: string) => void
   onAddContainer: (rowId: string) => void
@@ -116,7 +116,7 @@ function SortableRowSection({
 
 interface RowListProps {
   rows: Row[]
-  containers: Container[]
+  containers: ContainerSummary[]
   onDeleteRow: (row: Row) => void
   onReorderRows: (activeId: string, overId: string) => void
   onReorderContainers: (activeId: string, overId: string) => void
@@ -179,7 +179,7 @@ export function UnassignedSection({
   onReorderContainers,
   onAddContainer,
 }: {
-  containers: Container[]
+  containers: ContainerSummary[]
   onReorderContainers: (activeId: string, overId: string) => void
   onAddContainer: () => void
 }) {

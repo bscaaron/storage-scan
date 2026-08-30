@@ -16,6 +16,17 @@ import type { Location } from '../types'
 
 const COLLECTION = 'locations'
 
+function mapLocation(id: string, data: Record<string, unknown>): Location {
+  return {
+    id,
+    name: data.name as string,
+    sortOrder: (data.sortOrder as number) ?? 0,
+    containerCount: (data.containerCount as number) ?? 0,
+    createdAt: data.createdAt as number,
+    updatedAt: data.updatedAt as number,
+  }
+}
+
 export function useLocations() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,15 +34,34 @@ export function useLocations() {
   useEffect(() => {
     const q = query(collection(db, COLLECTION), orderBy('name'))
     const unsub = onSnapshot(q, (snap) => {
-      setLocations(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Location),
-      )
+      setLocations(snap.docs.map((d) => mapLocation(d.id, d.data())))
       setLoading(false)
     })
     return unsub
   }, [])
 
   return { locations, loading }
+}
+
+export function useLocation(locationId: string | undefined) {
+  const [location, setLocation] = useState<Location | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!locationId) {
+      setLocation(null)
+      setLoading(false)
+      return
+    }
+
+    const unsub = onSnapshot(doc(db, COLLECTION, locationId), (snap) => {
+      setLocation(snap.exists() ? mapLocation(snap.id, snap.data()) : null)
+      setLoading(false)
+    })
+    return unsub
+  }, [locationId])
+
+  return { location, loading }
 }
 
 export async function createLocation(name: string): Promise<string> {
@@ -44,6 +74,7 @@ export async function createLocation(name: string): Promise<string> {
   const ref = await addDoc(collection(db, COLLECTION), {
     name,
     sortOrder: maxSort + 1,
+    containerCount: 0,
     createdAt: now,
     updatedAt: now,
   })
@@ -65,7 +96,10 @@ export async function deleteLocation(id: string) {
   const containersSnap = await getDocs(
     query(collection(db, 'containers'), where('locationId', '==', id)),
   )
-  containersSnap.docs.forEach((d) => batch.delete(d.ref))
+  containersSnap.docs.forEach((d) => {
+    batch.delete(d.ref)
+    batch.delete(doc(db, 'containerDetails', d.id))
+  })
 
   batch.delete(doc(db, COLLECTION, id))
   await batch.commit()
