@@ -15,6 +15,12 @@ dist-ssr
 .env.*
 !.env.example
 
+# Local data migration backups (personal inventory)
+migrations-data/
+
+# Supabase CLI temp
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

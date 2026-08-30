@@ -2,7 +2,7 @@
 
 A web app for tracking the contents of storage containers throughout your home. Organize by location and optional rows, add rich-text notes and photos to each container, and share individual containers via link.
 
-**Live site:** `https://bscaaron.github.io/storage-scan/`
+**Live site:** `https://aaronjstanley.github.io/storage-scan/`
 
 ## Features
 
@@ -25,14 +25,14 @@ A web app for tracking the contents of storage containers throughout your home. 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/<your-username>/storage-scan.git
+git clone https://github.com/aaronjstanley/storage-scan.git
 cd storage-scan
 npm install
 ```
 
 ### 2. Supabase project
 
-This app uses Supabase project **Storage Scan** (`ncesmubuqxowqiohphrc`).
+This app uses Supabase project **Storage Scan** (`qybcztsfztmgavysyxqv`).
 
 The database schema is in [`supabase/migrations/`](supabase/migrations/). It creates:
 
@@ -46,7 +46,7 @@ The database schema is in [`supabase/migrations/`](supabase/migrations/). It cre
 cp .env.example .env
 ```
 
-Fill in from [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/ncesmubuqxowqiohphrc/settings/api):
+Fill in from [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/qybcztsfztmgavysyxqv/settings/api):
 
 | Variable | Description |
 |---|---|
@@ -82,7 +82,7 @@ In your repo: **Settings → Secrets and variables → Actions**, these secrets 
 
 ### 3. Enable GitHub Pages
 
-Go to [Settings → Pages](https://github.com/bscaaron/storage-scan/settings/pages) → **Build and deployment → Source** and select **GitHub Actions** (not “Deploy from a branch”).
+Go to [Settings → Pages](https://github.com/aaronjstanley/storage-scan/settings/pages) → **Build and deployment → Source** and select **GitHub Actions** (not “Deploy from a branch”).
 
 Then push to `main` or run **Actions → Deploy to GitHub Pages → Run workflow**.
 
@@ -92,7 +92,7 @@ Then push to `main` or run **Actions → Deploy to GitHub Pages → Run workflow
 
 **404:** Confirm the latest **Deploy to GitHub Pages** Action succeeded and secrets `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` are set.
 
-**Production URL:** `https://bscaaron.github.io/storage-scan/`
+**Production URL:** `https://aaronjstanley.github.io/storage-scan/`
 
 ## Data Model
 

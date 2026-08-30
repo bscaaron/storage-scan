@@ -89,38 +89,52 @@ export function useContainer(containerId: string | undefined) {
   const [container, setContainer] = useState<Container | null>(cached ?? null)
   const [loading, setLoading] = useState(Boolean(containerId && !cached))
 
+  const [error, setError] = useState<string | null>(null)
+
   const refresh = useCallback(async () => {
     if (!containerId) {
       setContainer(null)
+      setError(null)
       setLoading(false)
       return null
     }
-    const data = await fetchContainer(containerId)
-    if (data) cache.containerById.set(containerId, data)
-    else cache.containerById.delete(containerId)
-    setContainer(data)
-    setLoading(false)
-    return data
+    try {
+      const data = await fetchContainer(containerId)
+      if (data) cache.containerById.set(containerId, data)
+      else cache.containerById.delete(containerId)
+      setContainer(data)
+      setError(null)
+      return data
+    } catch (err) {
+      setContainer(null)
+      setError(err instanceof Error ? err.message : 'Failed to load container')
+      return null
+    } finally {
+      setLoading(false)
+    }
   }, [containerId])
 
   useEffect(() => {
     if (!containerId) {
       setContainer(null)
+      setError(null)
       setLoading(false)
       return
     }
     const hit = cache.containerById.get(containerId)
     if (hit) {
       setContainer(hit)
+      setError(null)
       setLoading(false)
       return
     }
     setContainer(null)
+    setError(null)
     setLoading(true)
     void refresh()
   }, [containerId, refresh])
 
-  return { container, loading, refresh, setContainer }
+  return { container, loading, error, refresh, setContainer }
 }
 
 export async function createContainer(

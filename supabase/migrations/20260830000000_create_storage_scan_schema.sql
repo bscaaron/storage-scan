@@ -1,4 +1,4 @@
--- Storage Scan schema (applied to Supabase project ncesmubuqxowqiohphrc)
+-- Storage Scan schema (target project: qybcztsfztmgavysyxqv)
 
 CREATE TABLE locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,7 +43,10 @@ CREATE POLICY "rows_all" ON rows FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "containers_all" ON containers FOR ALL USING (true) WITH CHECK (true);
 
 CREATE OR REPLACE FUNCTION update_location_container_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     UPDATE locations
@@ -56,7 +59,7 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER containers_count_insert
   AFTER INSERT ON containers

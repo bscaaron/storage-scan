@@ -13,7 +13,7 @@ const RichTextDisplay = lazy(() =>
 
 export function ShareContainerPage() {
   const { containerId } = useParams<{ containerId: string }>()
-  const { container } = useContainer(containerId)
+  const { container, loading, error } = useContainer(containerId)
   const { location } = useLocation(container?.locationId)
   const [locationName, setLocationName] = useState<string | null>(null)
 
@@ -25,10 +25,25 @@ export function ShareContainerPage() {
     }
   }, [container, location])
 
-  if (!container) {
+  if (loading) {
     return (
       <div className={ui.page}>
         <p className={ui.muted}>Loading container…</p>
+      </div>
+    )
+  }
+
+  if (error || !container) {
+    return (
+      <div className={ui.page}>
+        <p className={ui.muted}>
+          {error ? `Could not load container: ${error}` : 'Container not found.'}
+        </p>
+        <div className="mt-8 text-center">
+          <NavButton to="/" className={ui.btnSecondary}>
+            Open Storage Scanner
+          </NavButton>
+        </div>
       </div>
     )
   }
