@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ui } from './ui'
 
 interface ShareButtonProps {
   containerId: string
@@ -18,7 +19,7 @@ export function ShareButton({ containerId }: ShareButtonProps) {
     <button
       type="button"
       onClick={handleShare}
-      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      className={`${ui.btnSecondary} gap-2`}
       title="Copy share link"
     >
       <svg

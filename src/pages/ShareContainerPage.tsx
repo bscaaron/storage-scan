@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { PhotoUpload } from '../components/PhotoUpload'
+import { NavButton, ui } from '../components/ui'
 import { getContainerLocationName, useContainer } from '../hooks/useContainers'
 import { useLocation } from '../hooks/useLocations'
 
@@ -26,47 +27,46 @@ export function ShareContainerPage() {
 
   if (!container) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <p className="text-gray-500">Loading container…</p>
+      <div className={ui.page}>
+        <p className={ui.muted}>Loading container…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-2 text-sm text-gray-500">
-        {locationName ?? 'Storage Scan'}
-      </div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">
+    <div className={ui.page}>
+      <p className={`${ui.subtitle} mb-2`}>
+        {locationName ?? 'Storage Scanner'}
+      </p>
+      <h1 className="mb-6 text-2xl font-extrabold text-violet-800">
         Container {container.number}
       </h1>
 
-      <div className="space-y-6">
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">Contents</h2>
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <Suspense fallback={<p className="text-gray-500">Loading…</p>}>
-              <RichTextDisplay content={container.contents} />
-            </Suspense>
-          </div>
+      <div className="space-y-5">
+        <div className={ui.card}>
+          <h2 className={`${ui.sectionTitle} mb-3`}>Contents</h2>
+          <Suspense fallback={<p className={ui.muted}>Loading…</p>}>
+            <RichTextDisplay content={container.contents} />
+          </Suspense>
         </div>
 
         {container.photos.length > 0 && (
-          <PhotoUpload
-            photos={container.photos}
-            onUpload={async () => {}}
-            onRemove={async () => {}}
-            readOnly
-          />
+          <div className={ui.card}>
+            <PhotoUpload
+              photos={container.photos}
+              onUpload={async () => {}}
+              onRemove={async () => {}}
+              readOnly
+            />
+          </div>
         )}
       </div>
 
-      <p className="mt-8 text-center text-xs text-gray-400">
-        Shared via{' '}
-        <Link to="/" className="text-blue-500 hover:underline">
-          Storage Scan
-        </Link>
-      </p>
+      <div className="mt-8 text-center">
+        <NavButton to="/" className={ui.btnSecondary}>
+          Open Storage Scanner
+        </NavButton>
+      </div>
     </div>
   )
 }

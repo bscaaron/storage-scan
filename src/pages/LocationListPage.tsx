@@ -1,6 +1,12 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
+import { ContainerSearchResults } from '../components/ContainerSearchResults'
+import { IconButton, IconPlus, IconSearch, IconTrash } from '../components/icons'
+import { NavButton, ui } from '../components/ui'
+import {
+  searchContainers,
+  type ContainerSearchResult,
+} from '../hooks/useContainerSearch'
 import {
   createLocation,
   deleteLocation,
@@ -32,45 +38,45 @@ function LocationRow({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      {editing ? (
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          autoFocus
-          className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-        />
-      ) : (
-        <Link
-          to={`/location/${location.id}`}
-          onMouseEnter={() => prefetchLocation(location.id)}
-          className="flex-1 text-lg font-medium text-gray-900 hover:text-blue-600"
+    <div className={ui.card}>
+      <div className="flex items-center justify-between gap-2">
+        {editing ? (
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            autoFocus
+            className={`${ui.input} min-w-0 flex-1`}
+          />
+        ) : (
+          <NavButton
+            to={`/location/${location.id}`}
+            onPrefetch={() => prefetchLocation(location.id)}
+            className="min-w-0 flex-1 truncate text-left text-lg font-bold text-violet-800 transition active:scale-[0.98]"
+          >
+            {location.name}
+          </NavButton>
+        )}
+        <IconButton
+          title="Delete location"
+          variant="danger"
+          onClick={() => onDelete(location)}
         >
-          {location.name}
-        </Link>
-      )}
+          <IconTrash />
+        </IconButton>
+      </div>
 
-      <span className="text-sm text-gray-500">
-        {location.containerCount} container{location.containerCount !== 1 ? 's' : ''}
-      </span>
-
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        className="text-sm text-gray-500 hover:text-gray-700"
-      >
-        Rename
-      </button>
-      <button
-        type="button"
-        onClick={() => onDelete(location)}
-        className="text-sm text-red-600 hover:text-red-800"
-      >
-        Delete
-      </button>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
+          {location.containerCount}{' '}
+          {location.containerCount === 1 ? 'Container' : 'Containers'}
+        </span>
+        <button type="button" onClick={() => setEditing(true)} className={ui.btnGhost}>
+          Rename
+        </button>
+      </div>
     </div>
   )
 }
@@ -78,9 +84,50 @@ function LocationRow({
 export function LocationListPage() {
   const { locations, loading, refresh } = useLocations()
   const [newName, setNewName] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ContainerSearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null)
   const [saving, setSaving] = useState(false)
+  const addInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const sorted = sortLocations(locations)
+
+  useEffect(() => {
+    if (showAddForm) addInputRef.current?.focus()
+  }, [showAddForm])
+
+  useEffect(() => {
+    if (showSearch) searchInputRef.current?.focus()
+  }, [showSearch])
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!showSearch || trimmed.length < 2) {
+      setSearchResults([])
+      setSearching(false)
+      setSearchError(null)
+      return
+    }
+
+    setSearching(true)
+    setSearchError(null)
+
+    const timer = window.setTimeout(() => {
+      searchContainers(trimmed)
+        .then(setSearchResults)
+        .catch(() => {
+          setSearchResults([])
+          setSearchError('Search failed. Please try again.')
+        })
+        .finally(() => setSearching(false))
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, showSearch])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,55 +138,102 @@ export function LocationListPage() {
     try {
       await createLocation(trimmed)
       await refresh()
+      setShowAddForm(false)
     } finally {
       setSaving(false)
     }
   }
 
+  const toggleSearch = () => {
+    setShowSearch((open) => {
+      if (!open) setShowAddForm(false)
+      return !open
+    })
+  }
+
+  const toggleAddForm = () => {
+    setShowAddForm((open) => {
+      if (!open) {
+        setShowSearch(false)
+        setSearchQuery('')
+      }
+      return !open
+    })
+  }
+
+  const isSearching = showSearch && searchQuery.trim().length >= 2
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-gray-900">Storage Scan</h1>
-      <p className="mb-8 text-gray-600">
-        Track what's in your storage containers, organized by location.
-      </p>
-
-      <form onSubmit={handleAdd} className="mb-8 flex gap-2">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New location name (e.g. Garage West Shelf)"
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? 'Adding…' : 'Add Location'}
-        </button>
-      </form>
-
-      {loading && sorted.length === 0 ? (
-        <p className="text-center text-gray-500">Loading locations…</p>
-      ) : sorted.length === 0 ? (
-        <p className="text-center text-gray-500">
-          No locations yet. Add one above to get started.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {sorted.map((location) => (
-            <LocationRow
-              key={location.id}
-              location={location}
-              onRename={async (id, name) => {
-                await renameLocation(id, name)
-                await refresh()
-              }}
-              onDelete={setDeleteTarget}
-            />
-          ))}
+    <div className={ui.page}>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className={ui.title}>Storage Scanner</h1>
+        <div className="flex shrink-0 items-center">
+          <IconButton title="Search containers" onClick={toggleSearch}>
+            <IconSearch />
+          </IconButton>
+          <IconButton title="Add location" onClick={toggleAddForm}>
+            <IconPlus />
+          </IconButton>
         </div>
+      </div>
+
+      {showSearch && (
+        <div className="mb-6">
+          <input
+            ref={searchInputRef}
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search container contents…"
+            className={ui.input}
+          />
+        </div>
+      )}
+
+      {showAddForm && (
+        <form id="add-location-form" onSubmit={handleAdd} className="mb-6">
+          <input
+            ref={addInputRef}
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New location (e.g. Garage West Shelf)"
+            className={ui.input}
+          />
+        </form>
+      )}
+
+      {showSearch && (
+        <ContainerSearchResults
+          results={searchResults}
+          query={searchQuery}
+          searching={searching}
+          error={searchError}
+        />
+      )}
+
+      {!isSearching && (
+        <>
+          {loading && sorted.length === 0 ? (
+            <p className={ui.muted}>Loading locations…</p>
+          ) : sorted.length === 0 ? (
+            <p className={ui.muted}>No locations yet. Tap + to add one.</p>
+          ) : (
+            <div className="space-y-3">
+              {sorted.map((location) => (
+                <LocationRow
+                  key={location.id}
+                  location={location}
+                  onRename={async (id, name) => {
+                    await renameLocation(id, name)
+                    await refresh()
+                  }}
+                  onDelete={setDeleteTarget}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {deleteTarget && (

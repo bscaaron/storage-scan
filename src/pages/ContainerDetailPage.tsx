@@ -1,8 +1,10 @@
 import { lazy, Suspense, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
 import { PhotoUpload } from '../components/PhotoUpload'
+import { IconButton, IconTrash } from '../components/icons'
 import { ShareButton } from '../components/ShareButton'
+import { NavButton, ui } from '../components/ui'
 import {
   deleteContainer,
   getLocationContainers,
@@ -22,7 +24,7 @@ const RichTextEditor = lazy(() =>
 export function ContainerDetailPage() {
   const { containerId } = useParams<{ containerId: string }>()
   const navigate = useNavigate()
-  const { container } = useContainer(containerId)
+  const { container, loading } = useContainer(containerId)
   const { location } = useLocation(container?.locationId)
   const [showDelete, setShowDelete] = useState(false)
 
@@ -33,48 +35,50 @@ export function ContainerDetailPage() {
     navigate(`/location/${container.locationId}`)
   }
 
-  if (!container) {
+  if (loading || !container) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <Link to="/" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+      <div className={ui.page}>
+        <NavButton to="/" className={`${ui.btnBack} mb-4`}>
           ← Back
-        </Link>
-        <p className="text-gray-500">Loading container…</p>
+        </NavButton>
+        <p className={ui.muted}>Loading container…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <Link
+    <div className={ui.page}>
+      <NavButton
         to={`/location/${container.locationId}`}
-        className="mb-4 inline-block text-sm text-blue-600 hover:underline"
+        className={`${ui.btnBack} mb-4`}
       >
         ← {location?.name ?? 'Location'}
-      </Link>
+      </NavButton>
 
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Container {container.number}
-        </h1>
-        <div className="flex items-center gap-2">
-          <ShareButton containerId={container.id} />
-          <button
-            type="button"
-            onClick={() => setShowDelete(true)}
-            className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete
-          </button>
+      <div className={`${ui.cardAccent} mb-6`}>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="min-w-0 truncate text-2xl font-extrabold text-violet-800">
+            Container {container.number}
+          </h1>
+          <div className="flex shrink-0 items-center">
+            <ShareButton containerId={container.id} />
+            <IconButton
+              title="Delete container"
+              variant="danger"
+              onClick={() => setShowDelete(true)}
+            >
+              <IconTrash />
+            </IconButton>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">Contents</h2>
+      <div className="space-y-5">
+        <div className={ui.card}>
+          <h2 className={`${ui.sectionTitle} mb-3`}>Contents</h2>
           <Suspense
             fallback={
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+              <div className="rounded-2xl bg-violet-50 p-4 text-sm text-violet-500">
                 Loading editor…
               </div>
             }
@@ -86,15 +90,17 @@ export function ContainerDetailPage() {
           </Suspense>
         </div>
 
-        <PhotoUpload
-          photos={container.photos}
-          onUpload={async (file) => {
-            await uploadContainerPhoto(container.id, file, container.photos)
-          }}
-          onRemove={async (photo) => {
-            await removeContainerPhoto(container.id, photo, container.photos)
-          }}
-        />
+        <div className={ui.card}>
+          <PhotoUpload
+            photos={container.photos}
+            onUpload={async (file) => {
+              await uploadContainerPhoto(container.id, file, container.photos)
+            }}
+            onRemove={async (photo) => {
+              await removeContainerPhoto(container.id, photo, container.photos)
+            }}
+          />
+        </div>
       </div>
 
       {showDelete && (

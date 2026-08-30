@@ -16,6 +16,7 @@ export function RichTextEditor({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [StarterKit],
     content,
     editable: !readOnly,
@@ -40,12 +41,18 @@ export function RichTextEditor({
     }
   }, [editor, readOnly])
 
-  if (!editor) return null
+  if (!editor) {
+    return (
+      <div className="rounded-2xl bg-violet-50 p-4 text-sm text-violet-500">
+        Loading editor…
+      </div>
+    )
+  }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-2xl border-2 border-violet-200 bg-white shadow-inner shadow-violet-100">
       {!readOnly && (
-        <div className="flex flex-wrap gap-1 border-b border-gray-200 p-2">
+        <div className="flex flex-wrap gap-1 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 p-2">
           <ToolbarButton
             active={editor.isActive('bold')}
             onClick={() => editor.chain().focus().toggleBold().run()}
@@ -104,10 +111,10 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded px-2 py-1 text-sm ${
+      className={`min-h-9 min-w-9 rounded-xl px-2 py-1 text-sm font-semibold transition active:scale-95 ${
         active
-          ? 'bg-blue-100 text-blue-800'
-          : 'text-gray-600 hover:bg-gray-100'
+          ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-sm'
+          : 'text-violet-600 hover:bg-violet-100'
       } ${className}`}
     >
       {label}
@@ -117,7 +124,7 @@ function ToolbarButton({
 
 export function RichTextDisplay({ content }: { content: string }) {
   if (!content || content === '<p></p>') {
-    return <p className="text-gray-500 italic">No contents listed.</p>
+    return <p className="italic text-violet-500/70">No contents listed.</p>
   }
   return (
     <div

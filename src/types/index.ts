@@ -27,6 +27,7 @@ export interface ContainerSummary {
   locationId: string
   rowId: string | null
   number: number
+  hasContents: boolean
   createdAt: number
   updatedAt: number
 }

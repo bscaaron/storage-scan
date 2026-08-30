@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { cache, invalidateLocation, invalidateLocations } from '../lib/dataCache'
-import { mapLocation, mapRow } from '../lib/mappers'
+import { mapLocation, mapRow, mapContainerSummary } from '../lib/mappers'
 import { supabase } from '../lib/supabase'
 import type { Location } from '../types'
 
@@ -99,7 +99,7 @@ export async function prefetchLocation(locationId: string) {
       .order('number'),
     supabase
       .from('containers')
-      .select('id, location_id, row_id, number, created_at, updated_at')
+      .select('id, location_id, row_id, number, contents, photos, created_at, updated_at')
       .eq('location_id', locationId)
       .order('number'),
   ])
@@ -113,14 +113,7 @@ export async function prefetchLocation(locationId: string) {
   )
   cache.containersByLocation.set(
     locationId,
-    (containersRes.data ?? []).map((row) => ({
-      id: row.id,
-      locationId: row.location_id,
-      rowId: row.row_id,
-      number: row.number,
-      createdAt: new Date(row.created_at).getTime(),
-      updatedAt: new Date(row.updated_at).getTime(),
-    })),
+    (containersRes.data ?? []).map(mapContainerSummary),
   )
 }
 

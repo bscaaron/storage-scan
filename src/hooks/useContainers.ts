@@ -7,6 +7,7 @@ import {
 import {
   mapContainer,
   mapContainerSummary,
+  containerHasContents,
 } from '../lib/mappers'
 import {
   getNextNumber,
@@ -21,7 +22,7 @@ import type {
 } from '../types'
 
 const SUMMARY_COLUMNS =
-  'id, location_id, row_id, number, created_at, updated_at'
+  'id, location_id, row_id, number, contents, photos, created_at, updated_at'
 
 async function fetchContainers(locationId: string): Promise<ContainerSummary[]> {
   const { data, error } = await supabase
@@ -30,7 +31,11 @@ async function fetchContainers(locationId: string): Promise<ContainerSummary[]> 
     .eq('location_id', locationId)
     .order('number')
   if (error) throw error
-  return (data ?? []).map(mapContainerSummary)
+  return (data ?? []).map((row) => {
+    const full = mapContainer(row)
+    cache.containerById.set(full.id, full)
+    return mapContainerSummary(row)
+  })
 }
 
 async function fetchContainer(containerId: string): Promise<Container | null> {
@@ -110,7 +115,9 @@ export function useContainer(containerId: string | undefined) {
       setLoading(false)
       return
     }
-    refresh()
+    setContainer(null)
+    setLoading(true)
+    void refresh()
   }, [containerId, refresh])
 
   return { container, loading, refresh, setContainer }
@@ -210,7 +217,19 @@ export async function updateContainerContents(
   if (error) throw error
 
   const cached = cache.containerById.get(containerId)
-  if (cached) cache.containerById.set(containerId, { ...cached, contents })
+  if (cached) {
+    cache.containerById.set(containerId, {
+      ...cached,
+      contents,
+      hasContents: containerHasContents(contents, cached.photos),
+    })
+  }
+  invalidateLocationCacheForContainer(containerId)
+}
+
+function invalidateLocationCacheForContainer(containerId: string) {
+  const cached = cache.containerById.get(containerId)
+  if (cached) invalidateLocation(cached.locationId)
 }
 
 export async function uploadContainerPhoto(
@@ -242,7 +261,14 @@ export async function uploadContainerPhoto(
   if (error) throw error
 
   const cached = cache.containerById.get(containerId)
-  if (cached) cache.containerById.set(containerId, { ...cached, photos })
+  if (cached) {
+    cache.containerById.set(containerId, {
+      ...cached,
+      photos,
+      hasContents: containerHasContents(cached.contents, photos),
+    })
+  }
+  invalidateLocationCacheForContainer(containerId)
 
   return photos
 }
@@ -262,7 +288,14 @@ export async function removeContainerPhoto(
   if (error) throw error
 
   const cached = cache.containerById.get(containerId)
-  if (cached) cache.containerById.set(containerId, { ...cached, photos })
+  if (cached) {
+    cache.containerById.set(containerId, {
+      ...cached,
+      photos,
+      hasContents: containerHasContents(cached.contents, photos),
+    })
+  }
+  invalidateLocationCacheForContainer(containerId)
 
   return photos
 }

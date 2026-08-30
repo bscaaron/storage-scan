@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { ui } from './ui'
 import type { ContainerPhoto } from '../types'
 
 interface PhotoUploadProps {
@@ -31,20 +32,20 @@ export function PhotoUpload({
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-gray-700">Photos</h3>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+      <h3 className={`${ui.sectionTitle} mb-3`}>Photos</h3>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {photos.map((photo) => (
           <div key={photo.id} className="group relative aspect-square">
             <img
               src={photo.url}
               alt="Container contents"
-              className="h-full w-full rounded-lg object-cover"
+              className="h-full w-full rounded-2xl object-cover shadow-md ring-2 ring-violet-200"
             />
             {!readOnly && (
               <button
                 type="button"
                 onClick={() => onRemove(photo)}
-                className="absolute top-1 right-1 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white opacity-0 transition group-hover:opacity-100"
+                className="absolute top-2 right-2 min-h-8 min-w-8 rounded-full bg-gradient-to-r from-rose-500 to-red-500 text-sm font-bold text-white shadow-md"
               >
                 ✕
               </button>
@@ -56,7 +57,7 @@ export function PhotoUpload({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 transition hover:border-blue-400 hover:text-blue-500 disabled:opacity-50"
+            className="flex aspect-square flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50/80 text-sm font-bold text-violet-500 transition active:scale-[0.98] hover:border-fuchsia-400 hover:bg-fuchsia-50 hover:text-fuchsia-600 disabled:opacity-50"
           >
             {uploading ? 'Uploading…' : '+ Add photo'}
           </button>

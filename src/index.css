@@ -1,7 +1,15 @@
 @import 'tailwindcss';
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  min-height: 100dvh;
+  background: linear-gradient(
+    165deg,
+    #ede9fe 0%,
+    #fce7f3 35%,
+    #ffedd5 70%,
+    #e0f2fe 100%
+  );
+  @apply text-violet-950 antialiased;
 }
 
 .tiptap {
@@ -13,21 +21,21 @@ body {
 }
 
 .tiptap ul {
-  @apply list-disc pl-5 mb-2;
+  @apply mb-2 list-disc pl-5;
 }
 
 .tiptap ol {
-  @apply list-decimal pl-5 mb-2;
+  @apply mb-1 list-decimal pl-5;
 }
 
 .tiptap h1 {
-  @apply text-2xl font-bold mb-2;
+  @apply mb-2 text-2xl font-bold;
 }
 
 .tiptap h2 {
-  @apply text-xl font-bold mb-2;
+  @apply mb-2 text-xl font-bold;
 }
 
 .tiptap h3 {
-  @apply text-lg font-semibold mb-2;
+  @apply mb-2 text-lg font-semibold;
 }

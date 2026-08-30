@@ -1,7 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useLocation as useRouteLocation } from 'react-router-dom'
 import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
+import {
+  IconAddRow,
+  IconButton,
+  IconPlus,
+  IconTrash,
+} from '../components/icons'
 import { RowList, UnassignedSection } from '../components/RowSection'
+import { NavButton, ui } from '../components/ui'
 import {
   createContainer,
   deleteContainer,
@@ -15,6 +22,7 @@ import type { Row } from '../types'
 export function LocationGridPage() {
   const { locationId } = useParams<{ locationId: string }>()
   const navigate = useNavigate()
+  const pathname = useRouteLocation().pathname
   const { location, refresh: refreshLocation } = useLocation(locationId)
   const { rows, refresh: refreshRows } = useRows(locationId)
   const { containers, refresh: refreshContainers } = useContainers(locationId)
@@ -30,6 +38,10 @@ export function LocationGridPage() {
   const refreshAll = async () => {
     await Promise.all([refreshLocation(), refreshRows(), refreshContainers()])
   }
+
+  useEffect(() => {
+    refreshContainers()
+  }, [pathname, refreshContainers])
 
   const startEditing = () => {
     if (location) {
@@ -94,11 +106,11 @@ export function LocationGridPage() {
 
   if (!location) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <Link to="/" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+      <div className={ui.page}>
+        <NavButton to="/" className={`${ui.btnBack} mb-4`}>
           ← All locations
-        </Link>
-        <p className="text-gray-500">
+        </NavButton>
+        <p className={ui.muted}>
           {locationId ? 'Loading location…' : 'Location not found.'}
         </p>
       </div>
@@ -106,59 +118,61 @@ export function LocationGridPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <Link to="/" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+    <div className={ui.page}>
+      <NavButton to="/" className={`${ui.btnBack} mb-4`}>
         ← All locations
-      </Link>
+      </NavButton>
 
-      <div className="mb-6 flex items-center justify-between">
-        {editingName ? (
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={saveName}
-            onKeyDown={(e) => e.key === 'Enter' && saveName()}
-            autoFocus
-            className="text-2xl font-bold rounded border border-gray-300 px-3 py-1 focus:border-blue-500 focus:outline-none"
-          />
-        ) : (
-          <h1
-            className="text-2xl font-bold text-gray-900 cursor-pointer hover:text-blue-600"
-            onClick={startEditing}
-            title="Click to rename"
-          >
-            {location.name}
-          </h1>
-        )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            disabled={busy}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            + Row
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAddContainer(null)}
-            disabled={busy}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            + Container
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDeleteLocation(true)}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete location
-          </button>
+      <div className={`${ui.cardAccent} mb-6`}>
+        <div className="flex items-center justify-between gap-2">
+          {editingName ? (
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => e.key === 'Enter' && saveName()}
+              autoFocus
+              className={`${ui.input} min-w-0 flex-1`}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startEditing}
+              className="min-w-0 flex-1 truncate text-left text-2xl font-extrabold text-violet-800"
+              title="Tap to rename"
+            >
+              {location.name}
+            </button>
+          )}
+          <div className="flex shrink-0 items-center">
+            <IconButton
+              title="Add row"
+              onClick={handleAddRow}
+              disabled={busy}
+            >
+              <IconAddRow />
+            </IconButton>
+            <IconButton
+              title="Add container"
+              variant="teal"
+              onClick={() => handleAddContainer(null)}
+              disabled={busy}
+            >
+              <IconPlus />
+            </IconButton>
+            <IconButton
+              title="Delete location"
+              variant="danger"
+              onClick={() => setShowDeleteLocation(true)}
+            >
+              <IconTrash />
+            </IconButton>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <RowList
           rows={rows}
           containers={containers}

@@ -15,6 +15,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ContainerGrid } from './ContainerGrid'
+import { IconButton, IconPlus, IconTrash } from './icons'
+import { ui } from './ui'
 import type { ContainerSummary, Row } from '../types'
 
 interface RowSectionProps {
@@ -23,27 +25,6 @@ interface RowSectionProps {
   onDeleteRow: (row: Row) => void
   onReorderContainers: (activeId: string, overId: string) => void
   onAddContainer: (rowId: string) => void
-}
-
-function RowHeader({
-  row,
-  onDeleteRow,
-}: {
-  row: Row
-  onDeleteRow: (row: Row) => void
-}) {
-  return (
-    <div className="mb-3 flex items-center justify-between">
-      <h3 className="text-sm font-semibold text-gray-700">Row {row.number}</h3>
-      <button
-        type="button"
-        onClick={() => onDeleteRow(row)}
-        className="text-xs text-red-600 hover:text-red-800"
-      >
-        Delete row
-      </button>
-    </div>
-  )
 }
 
 function SortableRowSection({
@@ -69,40 +50,34 @@ function SortableRowSection({
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="rounded-xl border border-gray-200 bg-white p-4"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div ref={setNodeRef} style={style} className={ui.card}>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            className="cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+            className="min-h-10 min-w-10 shrink-0 cursor-grab rounded-xl bg-violet-100 text-lg text-violet-500 active:cursor-grabbing"
             {...attributes}
             {...listeners}
           >
             ⠿
           </button>
-          <h3 className="text-sm font-semibold text-gray-700">
-            Row {row.number}
-          </h3>
+          <h3 className={`${ui.sectionTitle} truncate`}>Row {row.number}</h3>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
+        <div className="flex shrink-0 items-center">
+          <IconButton
+            title="Add container"
+            variant="teal"
             onClick={() => onAddContainer(row.id)}
-            className="text-xs text-blue-600 hover:text-blue-800"
           >
-            + Container
-          </button>
-          <button
-            type="button"
+            <IconPlus />
+          </IconButton>
+          <IconButton
+            title="Delete row"
+            variant="danger"
             onClick={() => onDeleteRow(row)}
-            className="text-xs text-red-600 hover:text-red-800"
           >
-            Delete row
-          </button>
+            <IconTrash />
+          </IconButton>
         </div>
       </div>
       <ContainerGrid
@@ -184,18 +159,14 @@ export function UnassignedSection({
   onAddContainer: () => void
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">
+    <div className={ui.card}>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className={`${ui.sectionTitle} min-w-0 truncate`}>
           {containers.length > 0 ? 'Containers' : 'No rows — containers'}
         </h3>
-        <button
-          type="button"
-          onClick={onAddContainer}
-          className="text-xs text-blue-600 hover:text-blue-800"
-        >
-          + Container
-        </button>
+        <IconButton title="Add container" variant="teal" onClick={onAddContainer}>
+          <IconPlus />
+        </IconButton>
       </div>
       <ContainerGrid
         containers={containers}
@@ -205,5 +176,3 @@ export function UnassignedSection({
     </div>
   )
 }
-
-export { RowHeader }

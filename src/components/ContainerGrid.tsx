@@ -14,15 +14,47 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { prefetchContainer } from '../hooks/useContainers'
 import type { ContainerSummary } from '../types'
 
-interface SortableContainerTileProps {
-  container: ContainerSummary
+function tileClassName(hasContents: boolean) {
+  return hasContents
+    ? 'flex aspect-square w-full items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-violet-500 to-fuchsia-500 text-2xl font-extrabold text-white shadow-lg shadow-violet-500/30 transition active:scale-95'
+    : 'flex aspect-square w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-100/80 text-2xl font-extrabold text-slate-400 transition active:scale-95'
 }
 
-function SortableContainerTile({ container }: SortableContainerTileProps) {
+function ContainerTileButton({
+  container,
+  onNavigate,
+  className = '',
+}: {
+  container: ContainerSummary
+  onNavigate: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onNavigate}
+      onTouchStart={() => prefetchContainer(container.id)}
+      onMouseEnter={() => prefetchContainer(container.id)}
+      className={`${tileClassName(container.hasContents)} ${className}`}
+    >
+      {container.number}
+    </button>
+  )
+}
+
+interface SortableContainerTileProps {
+  container: ContainerSummary
+  onNavigate: () => void
+}
+
+function SortableContainerTile({
+  container,
+  onNavigate,
+}: SortableContainerTileProps) {
   const {
     attributes,
     listeners,
@@ -40,14 +72,10 @@ function SortableContainerTile({ container }: SortableContainerTileProps) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Link
-        to={`/container/${container.id}`}
-        onMouseEnter={() => prefetchContainer(container.id)}
-        onClick={(e) => isDragging && e.preventDefault()}
-        className="flex aspect-square items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 text-2xl font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-100 hover:shadow-md"
-      >
-        {container.number}
-      </Link>
+      <ContainerTileButton
+        container={container}
+        onNavigate={onNavigate}
+      />
     </div>
   )
 }
@@ -63,6 +91,8 @@ export function ContainerGrid({
   onReorder,
   sortable = false,
 }: ContainerGridProps) {
+  const navigate = useNavigate()
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
@@ -79,24 +109,27 @@ export function ContainerGrid({
 
   if (containers.length === 0) {
     return (
-      <p className="text-sm text-gray-500 italic">No containers yet.</p>
+      <p className="text-sm italic text-violet-500/70">No containers yet.</p>
     )
   }
 
+  const goTo = (id: string) => () => navigate(`/container/${id}`)
+
   const grid = (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+    <div className="grid grid-cols-4 gap-2">
       {containers.map((c) =>
         sortable ? (
-          <SortableContainerTile key={c.id} container={c} />
-        ) : (
-          <Link
+          <SortableContainerTile
             key={c.id}
-            to={`/container/${c.id}`}
-            onMouseEnter={() => prefetchContainer(c.id)}
-            className="flex aspect-square items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 text-2xl font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-100 hover:shadow-md"
-          >
-            {c.number}
-          </Link>
+            container={c}
+            onNavigate={goTo(c.id)}
+          />
+        ) : (
+          <ContainerTileButton
+            key={c.id}
+            container={c}
+            onNavigate={goTo(c.id)}
+          />
         ),
       )}
     </div>

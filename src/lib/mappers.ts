@@ -31,6 +31,18 @@ export function mapPhotos(value: unknown): ContainerPhoto[] {
   return value as ContainerPhoto[]
 }
 
+export function containerHasContents(
+  contents: string,
+  photos: ContainerPhoto[],
+): boolean {
+  if (photos.length > 0) return true
+  const text = contents
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
+  return text.length > 0
+}
+
 export function mapContainerSummary(row: {
   id: string
   location_id: string
@@ -38,21 +50,29 @@ export function mapContainerSummary(row: {
   number: number
   created_at: string
   updated_at: string
+  contents?: string
+  photos?: unknown
 }) {
+  const photos = mapPhotos(row.photos)
+  const contents = row.contents ?? ''
   return {
     id: row.id,
     locationId: row.location_id,
     rowId: row.row_id,
     number: row.number,
+    hasContents: containerHasContents(contents, photos),
     createdAt: toTimestamp(row.created_at),
     updatedAt: toTimestamp(row.updated_at),
   }
 }
 
 export function mapContainer(row: DbContainer) {
+  const photos = mapPhotos(row.photos)
+  const contents = row.contents ?? ''
   return {
     ...mapContainerSummary(row),
-    contents: row.contents ?? '',
-    photos: mapPhotos(row.photos),
+    contents,
+    photos,
+    hasContents: containerHasContents(contents, photos),
   }
 }
