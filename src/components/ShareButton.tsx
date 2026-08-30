@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getShareUrl } from '../lib/shareUrl'
 import { ui } from './ui'
 
 interface ShareButtonProps {
@@ -9,7 +10,7 @@ export function ShareButton({ containerId }: ShareButtonProps) {
   const [copied, setCopied] = useState(false)
 
   const handleShare = async () => {
-    const url = `${window.location.origin}${import.meta.env.BASE_URL}#/share/${containerId}`
+    const url = getShareUrl(containerId)
     await navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
